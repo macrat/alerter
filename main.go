@@ -16,6 +16,7 @@ var (
 	defaultFromName = os.Getenv("ALERTER_FROM_NAME")
 	defaultToAddr = os.Getenv("ALERTER_TO")
 	defaultToName = os.Getenv("ALERTER_TO_NAME")
+	defaultSubject = os.Getenv("ALERTER_SUBJECT")
 	apiKey = os.Getenv("ALERTER_SENDGRID_APIKEY")
 )
 
@@ -25,19 +26,19 @@ func main() {
 	fromAddr := flag.String("from", defaultFromAddr, "The From address. Read environment variable ALERTER_FROM in default.")
 	fromName := flag.String("from-name", defaultFromName, "The From name. Read environment variable ALERTER_FROM_NAME in default.")
 
-	subject := flag.String("subject", "alerter", "A subject of email.")
+	subject := flag.String("subject", defaultSubject, "A subject of email. Read environment variable ALERTER_SUBJECT in default.")
 
 	verbose := flag.Bool("verbose", false, "Verbose output.")
 	exVerbose := flag.Bool("extra-verbose", false, "Verbose output. included API KEY.")
 	dryrun := flag.Bool("dryrun", false, "Don't sent, only parse.")
+
+	flag.Parse()
 
 	if *verbose {
 		logrus.SetLevel(logrus.InfoLevel)
 	} else {
 		logrus.SetLevel(logrus.ErrorLevel)
 	}
-
-	flag.Parse()
 	if *exVerbose {
 		logrus.Info("api key: " + apiKey)
 	}
@@ -61,7 +62,7 @@ func main() {
 		logrus.Fatal("Failed to read message from stdin: " + err.Error())
 	}
 
-	logrus.Info("message:")
+	logrus.Info("## message ##")
 	logrus.Info("from address default: " + defaultFromAddr)
 	logrus.Info("from name default: " + defaultFromName)
 	logrus.Info("to address default: " + defaultToAddr)
@@ -70,11 +71,13 @@ func main() {
 	logrus.Info("from name: " + *fromName)
 	logrus.Info("to address: " + *toAddr)
 	logrus.Info("to name: " + *toName)
+	logrus.Info("default subject: " + defaultSubject)
 	logrus.Info("subject: " + *subject)
 	logrus.Info("payload:")
 	for _, line := range strings.Split(string(message), "\n") {
 		logrus.Info(line)
 	}
+	logrus.Info("## message ##")
 
 	from := mail.NewEmail(*fromName, *fromAddr)
 	to := mail.NewEmail(*toName, *toAddr)
