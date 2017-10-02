@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -29,75 +29,69 @@ func main() {
 
 	verbose := flag.Bool("verbose", false, "Verbose output.")
 	exVerbose := flag.Bool("extra-verbose", false, "Verbose output. included API KEY.")
+	dryrun := flag.Bool("dryrun", false, "Don't sent, only parse.")
 
+	if *verbose {
+		logrus.SetLevel(logrus.InfoLevel)
+	} else {
+		logrus.SetLevel(logrus.ErrorLevel)
+	}
 
 	flag.Parse()
+	if *exVerbose {
+		logrus.Info("api key: " + apiKey)
+	}
 
 	if *fromAddr == "" {
-		log.Fatalln("From address is not set. Please see -help.")
+		logrus.Fatal("From address is not set. Please see -help.")
 	}
 
 	if *toAddr == "" {
-		log.Fatalln("To address is not set. Please see -help.")
+		logrus.Fatal("To address is not set. Please see -help.")
 	}
 
 	if apiKey == "" {
-		log.Fatalln("Envronment variable ALERTER_SENDGRID_APIKEY was not set. Please set API KEY of SendGrid.")
+		logrus.Fatal("Envronment variable ALERTER_SENDGRID_APIKEY was not set. Please set API KEY of SendGrid.")
 	}
 
-
-	if *verbose || *exVerbose {
-		log.Println("loading message...")
-	}
-
+	logrus.Info("loading message...")
 
 	message, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
-		log.Fatalln("Failed to read message from stdin: " + err.Error())
+		logrus.Fatal("Failed to read message from stdin: " + err.Error())
 	}
 
-
-	if *verbose || *exVerbose {
-		log.Println("message:")
-
-		if *exVerbose {
-			log.Println("api key: " + apiKey)
-		}
-
-		log.Println("from address default: " + defaultFromAddr)
-		log.Println("from name default: " + defaultFromName)
-		log.Println("to address default: " + defaultToAddr)
-		log.Println("to name default: " + defaultToName)
-		log.Println("from address: " + *fromAddr)
-		log.Println("from name: " + *fromName)
-		log.Println("to address: " + *toAddr)
-		log.Println("to name: " + *toName)
-		log.Println("subject: " + *subject)
-		log.Println("payload:")
-		for _, line := range strings.Split(string(message), "\n") {
-			log.Println(line)
-		}
+	logrus.Info("message:")
+	logrus.Info("from address default: " + defaultFromAddr)
+	logrus.Info("from name default: " + defaultFromName)
+	logrus.Info("to address default: " + defaultToAddr)
+	logrus.Info("to name default: " + defaultToName)
+	logrus.Info("from address: " + *fromAddr)
+	logrus.Info("from name: " + *fromName)
+	logrus.Info("to address: " + *toAddr)
+	logrus.Info("to name: " + *toName)
+	logrus.Info("subject: " + *subject)
+	logrus.Info("payload:")
+	for _, line := range strings.Split(string(message), "\n") {
+		logrus.Info(line)
 	}
-
 
 	from := mail.NewEmail(*fromName, *fromAddr)
 	to := mail.NewEmail(*toName, *toAddr)
 	content := mail.NewContent("text/plain", string(message))
 	email := mail.NewV3MailInit(from, *subject, to, content)
 
+	logrus.Info("construct...")
 
-	if *verbose || *exVerbose {
-		log.Println("construct...")
-	}
+	if *dryrun {
+		logrus.Info("dryrun")
+	} else {
+		if response, err := sendgrid.NewSendClient(apiKey).Send(email); err != nil {
+			logrus.Fatal("Failed to send message: " + err.Error())
+		} else if response.StatusCode != 202 {
+			logrus.Fatalf("Failed to send message: code=%d: %s", response.StatusCode, response.Body)
+		}
 
-
-	if response, err := sendgrid.NewSendClient(apiKey).Send(email); err != nil {
-		log.Fatalln("Failed to send message: " + err.Error())
-	} else if response.StatusCode != 202 {
-		log.Fatalf("Failed to send message: code=%d: %s", response.StatusCode, response.Body)
-	}
-
-	if *verbose || *exVerbose {
-		log.Println("message sent")
+		logrus.Info("message sent")
 	}
 }
